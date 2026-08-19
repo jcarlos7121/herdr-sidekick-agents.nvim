@@ -6,7 +6,8 @@ Instead of embedding Claude Code in a Neovim terminal buffer, this plugin opens 
 
 ## Features
 
-- **Toggle** a Claude Code pane split off your editor pane (default: right side, 30% wide), with `cwd` set to Neovim's current working directory. Closing and reopening resumes the conversation when `--continue` is in `claude_args`.
+- **Toggle** a Claude Code pane split off your editor pane (default: right side, 30% wide), with `cwd` set to Neovim's current working directory. Toggling *hides* the pane by zooming the editor — the claude process keeps running and Herdr keeps notifying about its state — and toggling again reveals it. (Note: zoom hides *all* other panes in the tab, not just Claude.)
+- **Close** the pane for real with `close()` when you want the process gone. With `--continue` in `claude_args`, the next toggle resumes the conversation anyway.
 - **Send context** into Claude's input — *without submitting*, so you keep typing your instruction:
   - visual selection → `path/to/file.lua:12-34`
   - in [nvim-tree](https://github.com/nvim-tree/nvim-tree.lua) → the path of the node under the cursor
@@ -62,7 +63,8 @@ Note: `claude_args` is passed to the `claude` CLI verbatim. Flags like `--danger
 
 Everything goes through Herdr's CLI, using the environment Herdr injects into every pane (`HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_BIN_PATH`):
 
-- `toggle()` looks for a Claude agent pane in your tab (falling back to your space) via `herdr agent list`. If one exists it runs `herdr pane close`; otherwise `herdr pane split` + `herdr agent start --kind claude`, retrying briefly while the new pane's shell finishes booting.
+- `toggle()` looks for a Claude agent pane in your tab (falling back to your space) via `herdr agent list`. If one exists in your tab it toggles `herdr pane zoom` on the editor pane (hide/show without touching the process); in another tab it focuses it; otherwise `herdr pane split` + `herdr agent start --kind claude`, retrying briefly while the new pane's shell finishes booting.
+- `close()` runs `herdr pane close` on the Claude pane, ending the process.
 - `send()` uses `herdr pane send-text`, which types into Claude's input without pressing enter.
 
 A natural counterpart on the Herdr side is a keybind that closes the focused pane when it's a Claude agent — see [Herdr's custom command keybinds](https://herdr.dev/docs/configuration/) — so you can toggle from either side of the split.

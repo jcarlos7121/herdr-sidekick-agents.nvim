@@ -66,8 +66,24 @@ local function find_claude()
   return same_space
 end
 
---- Toggle the Claude pane: close it when one exists in this tab/space,
---- otherwise split one off the editor pane and start Claude in it.
+local function editor_zoomed()
+  local edges = herdr_json({ "pane", "edges", "--pane", vim.env.HERDR_PANE_ID })
+  local e = edges and edges.result and edges.result.edges
+  if not e then
+    return false
+  end
+  if e.zoomed ~= nil then
+    return e.zoomed
+  end
+  return e.layout and e.layout.zoomed or false
+end
+
+--- Toggle the Claude pane, claudecode.nvim-style hide/show:
+--- no Claude pane in this tab -> split one off the editor pane and start Claude;
+--- Claude pane visible        -> zoom the editor pane (hides it; Claude keeps
+---                               running and Herdr notifications keep firing);
+--- Claude pane hidden by zoom -> unzoom to reveal it.
+--- A Claude pane in another tab of the same space is focused instead.
 function M.toggle()
   if vim.env.HERDR_ENV ~= "1" then
     vim.notify("herdr-claude: not inside a herdr pane", vim.log.levels.WARN)
@@ -75,7 +91,13 @@ function M.toggle()
   end
   local existing = find_claude()
   if existing then
-    herdr_json({ "pane", "close", existing.pane_id })
+    if existing.tab_id ~= vim.env.HERDR_TAB_ID then
+      herdr_json({ "agent", "focus", existing.pane_id })
+    elseif editor_zoomed() then
+      herdr_json({ "pane", "zoom", "--off", "--pane", vim.env.HERDR_PANE_ID })
+    else
+      herdr_json({ "pane", "zoom", "--on", "--pane", vim.env.HERDR_PANE_ID })
+    end
     return
   end
   local split, err = herdr_json({
@@ -117,6 +139,17 @@ function M.toggle()
   vim.defer_fn(function()
     start_claude(1)
   end, 300)
+end
+
+--- Close the Claude pane for real (ends the claude process). With
+--- `--continue` in claude_args, the next toggle resumes the conversation.
+function M.close()
+  local existing = find_claude()
+  if not existing then
+    vim.notify("herdr-claude: no Claude pane to close", vim.log.levels.WARN)
+    return
+  end
+  herdr_json({ "pane", "close", existing.pane_id })
 end
 
 --- Type a context reference into the Claude pane's input, without submitting:
