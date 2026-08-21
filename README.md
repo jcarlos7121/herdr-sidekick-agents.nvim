@@ -1,4 +1,4 @@
-# herdr-claude-nvim
+# herdr-agents.nvim
 
 Drive coding-agent panes in [Herdr](https://herdr.dev) from Neovim.
 
@@ -28,9 +28,9 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  "jcarlos7121/herdr-claude-nvim",
+  "jcarlos7121/herdr-agents.nvim",
   cond = vim.env.HERDR_ENV == "1", -- only inside herdr
-  main = "herdr-claude",
+  main = "herdr-agents",
   opts = {},
 }
 ```
@@ -41,15 +41,15 @@ The plugin sets **no keymaps**. Map the functions however you like — each take
 
 ```lua
 -- Claude (the default agent)
-vim.keymap.set("n", ",4", function() require("herdr-claude").toggle() end,
+vim.keymap.set("n", ",4", function() require("herdr-agents").toggle() end,
   { desc = "Toggle Claude pane (herdr)" })
-vim.keymap.set({ "n", "v" }, ",5", function() require("herdr-claude").send() end,
+vim.keymap.set({ "n", "v" }, ",5", function() require("herdr-agents").send() end,
   { desc = "Send file/selection ref to Claude pane" })
 
 -- Codex
-vim.keymap.set("n", ",6", function() require("herdr-claude").toggle("codex") end,
+vim.keymap.set("n", ",6", function() require("herdr-agents").toggle("codex") end,
   { desc = "Toggle Codex pane (herdr)" })
-vim.keymap.set({ "n", "v" }, ",7", function() require("herdr-claude").send("codex") end,
+vim.keymap.set({ "n", "v" }, ",7", function() require("herdr-agents").send("codex") end,
   { desc = "Send file/selection ref to Codex pane" })
 ```
 
@@ -58,7 +58,7 @@ vim.keymap.set({ "n", "v" }, ",7", function() require("herdr-claude").send("code
 Defaults shown:
 
 ```lua
-require("herdr-claude").setup({
+require("herdr-agents").setup({
   ratio = 0.7,          -- editor pane's share of the tab (0.7 → agent gets 30%)
   direction = "right",  -- where the agent pane splits off: "right" or "down"
   start_retries = 10,   -- agent-start retries while the pane shell boots
