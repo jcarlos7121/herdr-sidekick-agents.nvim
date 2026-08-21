@@ -20,6 +20,10 @@ M.config = {
   -- shell is still booting (fish/zsh init scripts take a moment).
   start_retries = 10,
   start_retry_ms = 500,
+  -- How long `herdr agent start` waits for the agent to report interactive
+  -- readiness, in ms. Agents that show a first-run consent screen (grok) or
+  -- otherwise boot slowly need more than herdr's 30s default.
+  start_timeout_ms = 60000,
   -- Agent used when toggle()/send()/close() are called without a name.
   default_agent = "claude",
   -- Agent profiles. `kind` must be an agent kind Herdr knows (see
@@ -28,6 +32,7 @@ M.config = {
   agents = {
     claude = { kind = "claude", args = { "--continue" } },
     codex = { kind = "codex", args = {} },
+    grok = { kind = "grok", args = { "--continue" } },
   },
 }
 
@@ -52,6 +57,7 @@ function M.setup(opts)
       args = profile.args or existing.args or {},
       ratio = profile.ratio or existing.ratio,
       direction = profile.direction or existing.direction,
+      timeout_ms = profile.timeout_ms or existing.timeout_ms,
     }
   end
 end
@@ -167,6 +173,7 @@ function M.toggle(name)
       herdr_bin(), "agent", "start", herdr_name,
       "--kind", profile.kind,
       "--pane", pane.pane_id,
+      "--timeout", tostring(profile.timeout_ms or M.config.start_timeout_ms),
       "--",
     }
     vim.list_extend(cmd, profile.args or {})
@@ -179,6 +186,16 @@ function M.toggle(name)
         vim.defer_fn(function()
           start_agent(attempt + 1)
         end, M.config.start_retry_ms)
+      elseif out:find('"code":"timeout"', 1, true) then
+        -- herdr stopped waiting for a readiness signal, but the CLI is running
+        -- in the pane regardless (common on an agent's first-run consent screen)
+        vim.schedule(function()
+          vim.notify(
+            "herdr-agents: " .. profile.kind .. " did not report readiness in time; "
+              .. "check the pane — it is usually running",
+            vim.log.levels.WARN
+          )
+        end)
       else
         vim.schedule(function()
           vim.notify(

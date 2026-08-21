@@ -4,12 +4,12 @@ Drive coding-agent panes in [Herdr](https://herdr.dev) from Neovim.
 
 Instead of embedding an agent CLI in a Neovim terminal buffer, this plugin opens it in a **real Herdr pane** beside your editor. That makes your editor's agent a first-class Herdr agent: it shows working/blocked state in the sidebar, fires Herdr notifications when it finishes while you're elsewhere, participates in agent cycling keybinds, and gets resumed by Herdr's session restore.
 
-[Claude Code](https://claude.com/claude-code) is the default agent, and any agent kind Herdr supports — `codex`, `gemini`, `opencode`, … — works the same way through an agent profile.
+[Claude Code](https://claude.com/claude-code) is the default agent; `codex` and `grok` ship as profiles too, and any other agent kind Herdr supports — `gemini`, `opencode`, … — works the same way.
 
 ## Features
 
 - **Toggle** an agent pane split off your editor pane (default: right side, 30% wide), with `cwd` set to Neovim's current working directory. Toggling *hides* the pane by zooming the editor — the agent process keeps running and Herdr keeps notifying about its state — and toggling again reveals it. (Note: zoom hides *all* other panes in the tab, not just the agent.)
-- **Multiple agents side by side.** Claude in one pane, Codex in another, each toggled by its own key.
+- **Multiple agents side by side.** Claude in one pane, Codex or Grok in another, each toggled by its own key.
 - **Close** a pane for real with `close()` when you want the process gone. With a resume flag in the profile's args, the next toggle picks the conversation back up.
 - **Send context** into an agent's input — *without submitting*, so you keep typing your instruction:
   - visual selection → `path/to/file.lua:12-34`
@@ -51,6 +51,12 @@ vim.keymap.set("n", ",6", function() require("herdr-agents").toggle("codex") end
   { desc = "Toggle Codex pane (herdr)" })
 vim.keymap.set({ "n", "v" }, ",7", function() require("herdr-agents").send("codex") end,
   { desc = "Send file/selection ref to Codex pane" })
+
+-- Grok Build
+vim.keymap.set("n", ",8", function() require("herdr-agents").toggle("grok") end,
+  { desc = "Toggle Grok pane (herdr)" })
+vim.keymap.set({ "n", "v" }, ",9", function() require("herdr-agents").send("grok") end,
+  { desc = "Send file/selection ref to Grok pane" })
 ```
 
 ## Configuration
@@ -63,10 +69,12 @@ require("herdr-agents").setup({
   direction = "right",  -- where the agent pane splits off: "right" or "down"
   start_retries = 10,   -- agent-start retries while the pane shell boots
   start_retry_ms = 500,
+  start_timeout_ms = 60000, -- how long herdr waits for the agent to report readiness
   default_agent = "claude", -- used when toggle()/send()/close() get no name
   agents = {
     claude = { kind = "claude", args = { "--continue" } },
     codex  = { kind = "codex",  args = {} },
+    grok   = { kind = "grok",   args = { "--continue" } },
   },
 })
 ```
@@ -75,7 +83,9 @@ Each profile takes:
 
 - `kind` — an agent kind Herdr knows (`herdr agent start --help` lists them). Defaults to the profile name.
 - `args` — passed to that CLI verbatim, e.g. `{ "resume", "--last" }` for Codex or `{ "--continue" }` for Claude.
-- `ratio` / `direction` — optional per-agent overrides of the top-level values.
+- `ratio` / `direction` / `timeout_ms` — optional per-agent overrides of the top-level values.
+
+Agents that open a first-run consent screen (Grok Build does) may not report readiness before the timeout. That is not fatal — the CLI is running in the pane either way, and the plugin says so rather than reporting a failure.
 
 Adding another agent is just another profile:
 
