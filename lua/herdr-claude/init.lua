@@ -1,29 +1,69 @@
--- herdr-claude-nvim — drive a Claude Code pane in Herdr from Neovim.
+-- herdr-claude-nvim — drive coding-agent panes in Herdr from Neovim.
 --
--- Instead of embedding Claude Code in a Neovim terminal, this opens it in a
+-- Instead of embedding an agent CLI in a Neovim terminal, this opens it in a
 -- real Herdr pane next to your editor, so all of Herdr's agent features work
 -- on it: state notifications, sidebar status, agent cycling, session resume.
+--
+-- Claude Code is the default agent; any agent kind Herdr supports (codex,
+-- gemini, opencode, ...) can be added under `agents` in setup().
 --
 -- No keymaps are set by this plugin — see the README for suggested mappings.
 local M = {}
 
 M.config = {
-  -- Fraction of the tab the *editor* pane keeps when the Claude pane opens
-  -- (herdr's split ratio is the original pane's share; 0.7 → Claude gets 30%).
+  -- Fraction of the tab the *editor* pane keeps when the agent pane opens
+  -- (herdr's split ratio is the original pane's share; 0.7 → agent gets 30%).
   ratio = 0.7,
   -- Direction of the split relative to the editor pane.
   direction = "right",
-  -- Extra arguments passed to the `claude` CLI when the pane starts.
-  -- e.g. { "--continue" } to resume the previous conversation on reopen.
-  claude_args = { "--continue" },
   -- How long to keep retrying `herdr agent start` while the new pane's
   -- shell is still booting (fish/zsh init scripts take a moment).
   start_retries = 10,
   start_retry_ms = 500,
+  -- Agent used when toggle()/send()/close() are called without a name.
+  default_agent = "claude",
+  -- Agent profiles. `kind` must be an agent kind Herdr knows (see
+  -- `herdr agent start --help`); `args` is passed to that CLI verbatim.
+  -- `ratio` and `direction` may be overridden per agent.
+  agents = {
+    claude = { kind = "claude", args = { "--continue" } },
+    codex = { kind = "codex", args = {} },
+  },
 }
 
 function M.setup(opts)
-  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+  opts = vim.deepcopy(opts or {})
+  -- `agents` and list-valued args are replaced wholesale, not deep-merged,
+  -- so a shorter arg list cannot inherit stale trailing entries.
+  local agents = opts.agents
+  opts.agents = nil
+  local legacy_claude_args = opts.claude_args
+  opts.claude_args = nil
+
+  M.config = vim.tbl_deep_extend("force", M.config, opts)
+
+  if legacy_claude_args then
+    M.config.agents.claude.args = legacy_claude_args
+  end
+  for name, profile in pairs(agents or {}) do
+    local existing = M.config.agents[name] or {}
+    M.config.agents[name] = {
+      kind = profile.kind or existing.kind or name,
+      args = profile.args or existing.args or {},
+      ratio = profile.ratio or existing.ratio,
+      direction = profile.direction or existing.direction,
+    }
+  end
+end
+
+local function profile_for(name)
+  name = name or M.config.default_agent
+  local profile = M.config.agents[name]
+  if not profile then
+    -- unknown name: treat it as a bare agent kind with no arguments
+    profile = { kind = name, args = {} }
+  end
+  return name, profile
 end
 
 local function herdr_bin()
@@ -48,13 +88,13 @@ local function herdr_json(args)
   return decoded
 end
 
--- The Claude agent pane closest to this Neovim: same tab first, then same space.
-local function find_claude()
+-- The agent pane of this kind closest to this Neovim: same tab, then same space.
+local function find_agent(kind)
   local decoded = herdr_json({ "agent", "list" })
   local agents = decoded and decoded.result and decoded.result.agents or {}
   local same_space
   for _, a in ipairs(agents) do
-    if a.agent == "claude" and a.pane_id ~= vim.env.HERDR_PANE_ID then
+    if a.agent == kind and a.pane_id ~= vim.env.HERDR_PANE_ID then
       if a.tab_id == vim.env.HERDR_TAB_ID then
         return a
       end
@@ -78,18 +118,21 @@ local function editor_zoomed()
   return e.layout and e.layout.zoomed or false
 end
 
---- Toggle the Claude pane, claudecode.nvim-style hide/show:
---- no Claude pane in this tab -> split one off the editor pane and start Claude;
---- Claude pane visible        -> zoom the editor pane (hides it; Claude keeps
----                               running and Herdr notifications keep firing);
---- Claude pane hidden by zoom -> unzoom to reveal it.
---- A Claude pane in another tab of the same space is focused instead.
-function M.toggle()
+--- Toggle an agent pane, claudecode.nvim-style hide/show:
+--- no pane for this agent in the tab -> split one off the editor and start it;
+--- pane visible                      -> zoom the editor pane (hides it; the
+---                                      agent keeps running and Herdr keeps
+---                                      notifying about its state);
+--- pane hidden by zoom               -> unzoom to reveal it.
+--- A matching pane in another tab of the same space is focused instead.
+---@param name string|nil agent profile name (default: config.default_agent)
+function M.toggle(name)
   if vim.env.HERDR_ENV ~= "1" then
     vim.notify("herdr-claude: not inside a herdr pane", vim.log.levels.WARN)
     return
   end
-  local existing = find_claude()
+  local agent_name, profile = profile_for(name)
+  local existing = find_agent(profile.kind)
   if existing then
     if existing.tab_id ~= vim.env.HERDR_TAB_ID then
       herdr_json({ "agent", "focus", existing.pane_id })
@@ -103,8 +146,8 @@ function M.toggle()
   local split, err = herdr_json({
     "pane", "split",
     "--pane", vim.env.HERDR_PANE_ID,
-    "--direction", M.config.direction,
-    "--ratio", tostring(M.config.ratio),
+    "--direction", profile.direction or M.config.direction,
+    "--ratio", tostring(profile.ratio or M.config.ratio),
     "--cwd", vim.fn.getcwd(),
     "--focus",
   })
@@ -114,12 +157,19 @@ function M.toggle()
     return
   end
   -- herdr agent names: lowercase letters, digits, hyphens; must start lowercase
-  local name = "claude-" .. (vim.env.HERDR_TAB_ID or "main"):lower():gsub("[^%w]", "-")
+  local herdr_name = agent_name:lower():gsub("[^%w]", "-")
+    .. "-"
+    .. (vim.env.HERDR_TAB_ID or "main"):lower():gsub("[^%w]", "-")
   -- The fresh pane's shell needs a moment before it counts as "an available
   -- shell" — retry agent start until it is ready.
-  local function start_claude(attempt)
-    local cmd = { herdr_bin(), "agent", "start", name, "--kind", "claude", "--pane", pane.pane_id, "--" }
-    vim.list_extend(cmd, M.config.claude_args)
+  local function start_agent(attempt)
+    local cmd = {
+      herdr_bin(), "agent", "start", herdr_name,
+      "--kind", profile.kind,
+      "--pane", pane.pane_id,
+      "--",
+    }
+    vim.list_extend(cmd, profile.args or {})
     vim.system(cmd, { text = true }, function(res)
       if res.code == 0 then
         return
@@ -127,39 +177,49 @@ function M.toggle()
       local out = (res.stderr or "") .. (res.stdout or "")
       if out:find("agent_pane_busy", 1, true) and attempt < M.config.start_retries then
         vim.defer_fn(function()
-          start_claude(attempt + 1)
+          start_agent(attempt + 1)
         end, M.config.start_retry_ms)
       else
         vim.schedule(function()
-          vim.notify("herdr-claude: claude failed to start: " .. out, vim.log.levels.ERROR)
+          vim.notify(
+            "herdr-claude: " .. profile.kind .. " failed to start: " .. out,
+            vim.log.levels.ERROR
+          )
         end)
       end
     end)
   end
   vim.defer_fn(function()
-    start_claude(1)
+    start_agent(1)
   end, 300)
 end
 
---- Close the Claude pane for real (ends the claude process). With
---- `--continue` in claude_args, the next toggle resumes the conversation.
-function M.close()
-  local existing = find_claude()
+--- Close an agent pane for real (ends the process). With a resume flag in the
+--- profile's args, the next toggle picks the conversation back up.
+---@param name string|nil agent profile name (default: config.default_agent)
+function M.close(name)
+  local _, profile = profile_for(name)
+  local existing = find_agent(profile.kind)
   if not existing then
-    vim.notify("herdr-claude: no Claude pane to close", vim.log.levels.WARN)
+    vim.notify("herdr-claude: no " .. profile.kind .. " pane to close", vim.log.levels.WARN)
     return
   end
   herdr_json({ "pane", "close", existing.pane_id })
 end
 
---- Type a context reference into the Claude pane's input, without submitting:
+--- Type a context reference into an agent pane's input, without submitting:
 --- visual mode  -> "<relpath>:<start>-<end> "
 --- in nvim-tree -> path of the node under the cursor
 --- normal mode  -> current buffer's relative path
-function M.send()
-  local target = find_claude()
+---@param name string|nil agent profile name (default: config.default_agent)
+function M.send(name)
+  local _, profile = profile_for(name)
+  local target = find_agent(profile.kind)
   if not target then
-    vim.notify("herdr-claude: no Claude pane in this tab — toggle one open first", vim.log.levels.WARN)
+    vim.notify(
+      "herdr-claude: no " .. profile.kind .. " pane in this tab — toggle one open first",
+      vim.log.levels.WARN
+    )
     return
   end
   local text
