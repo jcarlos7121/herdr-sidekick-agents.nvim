@@ -1,4 +1,4 @@
-# herdr-agents.nvim
+# herdr-sidekick-agents.nvim
 
 Drive coding-agent panes in [Herdr](https://herdr.dev) from Neovim.
 
@@ -31,9 +31,9 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  "jcarlos7121/herdr-agents.nvim",
+  "jcarlos7121/herdr-sidekick-agents.nvim",
   cond = vim.env.HERDR_ENV == "1", -- only inside herdr
-  main = "herdr-agents",
+  main = "herdr-sidekick-agents",
   opts = {},
 }
 ```
@@ -44,18 +44,18 @@ The plugin sets **no keymaps**. Map the functions however you like — each take
 
 ```lua
 -- the whole flow, any agent
-vim.keymap.set("n", ",4", function() require("herdr-agents").toggle() end,
+vim.keymap.set("n", ",4", function() require("herdr-sidekick-agents").toggle() end,
   { desc = "Toggle agent pane (herdr)" })
-vim.keymap.set({ "n", "v" }, ",5", function() require("herdr-agents").send() end,
+vim.keymap.set({ "n", "v" }, ",5", function() require("herdr-sidekick-agents").send() end,
   { desc = "Send file/selection ref to agent pane" })
 ```
 
 Optional extras — a dedicated key for one agent, or a second agent beside the first:
 
 ```lua
-vim.keymap.set("n", ",6", function() require("herdr-agents").toggle("codex") end,
+vim.keymap.set("n", ",6", function() require("herdr-sidekick-agents").toggle("codex") end,
   { desc = "Toggle Codex pane (herdr)" })
-vim.keymap.set("n", ",7", function() require("herdr-agents").pick() end,
+vim.keymap.set("n", ",7", function() require("herdr-sidekick-agents").pick() end,
   { desc = "Start another agent pane (herdr)" })
 ```
 
@@ -64,7 +64,7 @@ vim.keymap.set("n", ",7", function() require("herdr-agents").pick() end,
 Defaults shown:
 
 ```lua
-require("herdr-agents").setup({
+require("herdr-sidekick-agents").setup({
   ratio = 0.7,          -- editor pane's share of the tab (0.7 → agent gets 30%)
   direction = "right",  -- where the agent pane splits off: "right" or "down"
   start_retries = 10,   -- agent-start retries while the pane shell boots

@@ -1,4 +1,4 @@
--- herdr-agents.nvim — drive coding-agent panes in Herdr from Neovim.
+-- herdr-sidekick-agents.nvim — drive coding-agent panes in Herdr from Neovim.
 --
 -- Instead of embedding an agent CLI in a Neovim terminal, this opens it in a
 -- real Herdr pane next to your editor, so all of Herdr's agent features work
@@ -195,7 +195,7 @@ local function start_agent(agent_name)
   })
   local pane = split and split.result and split.result.pane
   if not pane then
-    vim.notify("herdr-agents: pane split failed: " .. (err or "?"), vim.log.levels.ERROR)
+    vim.notify("herdr-sidekick-agents: pane split failed: " .. (err or "?"), vim.log.levels.ERROR)
     return
   end
   M._last_by_tab[vim.env.HERDR_TAB_ID or ""] = agent_name
@@ -228,7 +228,7 @@ local function start_agent(agent_name)
         -- in the pane regardless (common on an agent's first-run consent screen)
         vim.schedule(function()
           vim.notify(
-            "herdr-agents: " .. profile.kind .. " did not report readiness in time; "
+            "herdr-sidekick-agents: " .. profile.kind .. " did not report readiness in time; "
               .. "check the pane — it is usually running",
             vim.log.levels.WARN
           )
@@ -236,7 +236,7 @@ local function start_agent(agent_name)
       else
         vim.schedule(function()
           vim.notify(
-            "herdr-agents: " .. profile.kind .. " failed to start: " .. out,
+            "herdr-sidekick-agents: " .. profile.kind .. " failed to start: " .. out,
             vim.log.levels.ERROR
           )
         end)
@@ -254,7 +254,7 @@ end
 function M.pick(on_pick)
   local names = agent_names()
   if #names == 0 then
-    vim.notify("herdr-agents: no agents configured", vim.log.levels.ERROR)
+    vim.notify("herdr-sidekick-agents: no agents configured", vim.log.levels.ERROR)
     return
   end
   if #names == 1 then
@@ -277,7 +277,7 @@ end
 ---@param name string|nil restrict to one agent profile; omit for "any agent"
 function M.toggle(name)
   if vim.env.HERDR_ENV ~= "1" then
-    vim.notify("herdr-agents: not inside a herdr pane", vim.log.levels.WARN)
+    vim.notify("herdr-sidekick-agents: not inside a herdr pane", vim.log.levels.WARN)
     return
   end
   local wanted
@@ -314,7 +314,7 @@ function M.close(name)
   end
   local existing = find_agent(wanted)
   if not existing then
-    vim.notify("herdr-agents: no agent pane to close", vim.log.levels.WARN)
+    vim.notify("herdr-sidekick-agents: no agent pane to close", vim.log.levels.WARN)
     return
   end
   herdr_json({ "pane", "close", existing.pane_id })
@@ -333,7 +333,7 @@ function M.send(name)
   end
   local target = find_agent(wanted)
   if not target then
-    vim.notify("herdr-agents: no agent pane open — toggle one open first", vim.log.levels.WARN)
+    vim.notify("herdr-sidekick-agents: no agent pane open — toggle one open first", vim.log.levels.WARN)
     return
   end
   local text
@@ -349,14 +349,14 @@ function M.send(name)
     local ok, api = pcall(require, "nvim-tree.api")
     local node = ok and api.tree.get_node_under_cursor()
     if not (node and node.absolute_path) then
-      vim.notify("herdr-agents: no file under cursor", vim.log.levels.WARN)
+      vim.notify("herdr-sidekick-agents: no file under cursor", vim.log.levels.WARN)
       return
     end
     text = vim.fn.fnamemodify(node.absolute_path, ":.") .. " "
   else
     local path = vim.fn.expand("%:.")
     if path == "" then
-      vim.notify("herdr-agents: buffer has no file path", vim.log.levels.WARN)
+      vim.notify("herdr-sidekick-agents: buffer has no file path", vim.log.levels.WARN)
       return
     end
     text = path .. " "
