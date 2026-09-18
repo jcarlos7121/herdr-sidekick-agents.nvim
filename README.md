@@ -11,6 +11,7 @@ The whole flow needs **two keys, whatever agents you use**: one to open/hide the
 ## Features
 
 - **One key to open or hide.** With no agent pane yet, `toggle()` asks which agent to start (via `vim.ui.select`, so it uses your picker UI); with one already open it *hides* the pane by zooming the editor — the agent process keeps running and Herdr keeps notifying about its state — and toggling again reveals it. A single configured agent skips the prompt. (Note: zoom hides *all* other panes in the tab, not just the agent.)
+- **One key to go the other way.** `focus()` jumps to the agent pane and zooms it, hiding the editor — the inverse of `toggle()`'s hide. Herdr's own zoom key (`prefix+z`) brings the editor back from there.
 - **One key to send context**, agent-agnostic: `send()` targets whichever agent pane is open, so the same key works for Claude, Codex, Grok or anything you add later.
 - **Optional named agents.** Every function takes an agent name (`toggle("codex")`) when you want a dedicated key or a second agent alongside the first.
 - **Close** a pane for real with `close()` when you want the process gone. With a resume flag in the profile's args, the next toggle picks the conversation back up.
@@ -50,13 +51,15 @@ vim.keymap.set({ "n", "v" }, ",5", function() require("herdr-sidekick-agents").s
   { desc = "Send file/selection ref to agent pane" })
 ```
 
-Optional extras — a dedicated key for one agent, or a second agent beside the first:
+Optional extras — focus the agent full-screen, a dedicated key for one agent, or a second agent beside the first:
 
 ```lua
-vim.keymap.set("n", ",6", function() require("herdr-sidekick-agents").toggle("codex") end,
-  { desc = "Toggle Codex pane (herdr)" })
-vim.keymap.set("n", ",7", function() require("herdr-sidekick-agents").pick() end,
+vim.keymap.set("n", ",7", function() require("herdr-sidekick-agents").focus() end,
+  { desc = "Focus agent pane, hide editor (herdr)" })
+vim.keymap.set("n", ",6", function() require("herdr-sidekick-agents").pick() end,
   { desc = "Start another agent pane (herdr)" })
+vim.keymap.set("n", ",8", function() require("herdr-sidekick-agents").toggle("codex") end,
+  { desc = "Toggle Codex pane (herdr)" })
 ```
 
 ## Configuration
@@ -105,6 +108,7 @@ Note: `args` is passed through verbatim. Flags like `--dangerously-skip-permissi
 Everything goes through Herdr's CLI, using the environment Herdr injects into every pane (`HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_BIN_PATH`):
 
 - `toggle()` looks for a pane running any configured agent kind in your tab (falling back to your space) via `herdr agent list`. If one exists in your tab it toggles `herdr pane zoom` on the editor pane (hide/show without touching the process); in another tab it focuses it; otherwise it asks which agent to start, then `herdr pane split` + `herdr agent start --kind <kind>`, retrying briefly while the new pane's shell finishes booting. Passing a name restricts every step to that one agent.
+- `focus()` unzooms the editor if needed, then `herdr agent focus` + `herdr pane zoom --on` on the agent's pane.
 - `close()` runs `herdr pane close` on the agent's pane, ending the process.
 - `send()` uses `herdr pane send-text`, which types into the agent's input without pressing enter.
 - When a tab holds more than one agent pane, the one this Neovim started most recently there wins; otherwise the first match in the tab does.

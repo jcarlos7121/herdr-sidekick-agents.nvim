@@ -27,6 +27,14 @@ M.config = {
   -- readiness, in ms. Agents that show a first-run consent screen (grok) or
   -- otherwise boot slowly need more than herdr's 30s default.
   start_timeout_ms = 60000,
+  -- Extra `--env KEY=VALUE` pairs for the agent pane's shell.
+  -- Q_TERM=1 stops kiro-cli from re-exec'ing the shell through its kiro-cli-term
+  -- wrapper, which renames the process to "fish (kiro-cli-term)". herdr
+  -- identifies shells by process name, so with the wrapper in place every pane
+  -- reports `agent_pane_busy: not an available shell` and no retry can succeed.
+  -- (kiro's own SHOULD_QTERM_LAUNCH is hardcoded in its init, so it cannot be
+  -- overridden from outside; Q_TERM is the switch that works.)
+  pane_env = { "Q_TERM=1" },
   -- Offered first in the picker, and used by the named-agent API as a default.
   default_agent = "claude",
   -- Optional explicit picker order. Unlisted agents follow, alphabetically.
@@ -185,14 +193,18 @@ end
 --- Split a pane off the editor and start `agent_name` in it.
 local function start_agent(agent_name)
   local _, profile = profile_for(agent_name)
-  local split, err = herdr_json({
+  local split_cmd = {
     "pane", "split",
     "--pane", vim.env.HERDR_PANE_ID,
     "--direction", profile.direction or M.config.direction,
     "--ratio", tostring(profile.ratio or M.config.ratio),
     "--cwd", vim.fn.getcwd(),
     "--focus",
-  })
+  }
+  for _, kv in ipairs(profile.pane_env or M.config.pane_env or {}) do
+    vim.list_extend(split_cmd, { "--env", kv })
+  end
+  local split, err = herdr_json(split_cmd)
   local pane = split and split.result and split.result.pane
   if not pane then
     vim.notify("herdr-sidekick-agents: pane split failed: " .. (err or "?"), vim.log.levels.ERROR)
@@ -300,6 +312,33 @@ function M.toggle(name)
     start_agent(name)
   else
     M.pick()
+  end
+end
+
+--- Focus the agent pane and zoom it, hiding the editor — the inverse of
+--- toggle()'s hide. Once you are in the agent pane, Herdr's own zoom key
+--- (prefix+z by default) unzooms to bring the editor back.
+---@param name string|nil restrict to one agent profile; omit for "any agent"
+---@param opts table|nil pass { zoom = false } to focus without zooming
+function M.focus(name, opts)
+  opts = opts or {}
+  local wanted
+  if name then
+    local _, profile = profile_for(name)
+    wanted = { [profile.kind] = true }
+  end
+  local target = find_agent(wanted)
+  if not target then
+    vim.notify("herdr-sidekick-agents: no agent pane open — toggle one open first", vim.log.levels.WARN)
+    return
+  end
+  -- a zoomed editor hides the agent pane, so drop that zoom before moving
+  if editor_zoomed() then
+    herdr_json({ "pane", "zoom", "--off", "--pane", vim.env.HERDR_PANE_ID })
+  end
+  herdr_json({ "agent", "focus", target.pane_id })
+  if opts.zoom ~= false then
+    herdr_json({ "pane", "zoom", "--on", "--pane", target.pane_id })
   end
 end
 
