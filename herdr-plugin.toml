@@ -1,0 +1,23 @@
+id = "jcarlos7121.sidekick-agents"
+name = "Sidekick Agents"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+description = "Toggle coding-agent panes beside Neovim and send file/selection references to them"
+platforms = ["linux", "macos"]
+
+# The Neovim half lives in lua/herdr-sidekick-agents and is installed with your
+# Neovim plugin manager. This manifest adds the Herdr half: an action to bind in
+# ~/.config/herdr/config.toml so the agent pane can be closed from either side:
+#
+#   [[keys.command]]
+#   key = "prefix+a"
+#   type = "plugin_action"
+#   command = "jcarlos7121.sidekick-agents.close-agent"
+#   description = "close agent pane"
+
+[[actions]]
+id = "close-agent"
+title = "Close focused agent pane"
+description = "Close the focused pane when it hosts a coding agent; does nothing otherwise"
+contexts = ["pane"]
+command = ["sh", "scripts/close-agent.sh"]
