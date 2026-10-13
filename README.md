@@ -80,7 +80,7 @@ vim.keymap.set("n", ",8", function() require("herdr-sidekick-agents").toggle("co
   { desc = "Toggle Codex pane (herdr)" })
 ```
 
-`pick()` always starts a new pane: it shows the agent picker even when an agent pane is already open. Pass `{ zoom = false }` as the second argument to `focus()` (e.g. `focus(nil, { zoom = false })`) to jump to the agent pane without zooming it.
+`pick()` always starts a new pane, even when an agent pane is already open (it asks which agent unless only one is configured). Pass `{ zoom = false }` as the second argument to `focus()` (e.g. `focus(nil, { zoom = false })`) to jump to the agent pane without zooming it.
 
 ## Configuration
 
