@@ -41,7 +41,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ### Herdr side (optional)
 
-The repo is also a [Herdr plugin](https://herdr.dev/docs/plugins/) with one action, `close-agent`, which closes the focused pane only when it hosts a coding agent (on the editor or a plain shell it does nothing). It lets you close the agent pane from the Herdr side of the split as well:
+The repo is also a [Herdr plugin](https://herdr.dev/docs/plugins/) with one action, `close-agent`, which closes the focused pane only when Herdr detects a coding agent in it (any agent, not just ones this plugin started; on the editor or a plain shell it does nothing). It lets you close the agent pane from the Herdr side of the split as well:
 
 ```sh
 herdr plugin install jcarlos7121/herdr-sidekick-agents.nvim
@@ -59,7 +59,7 @@ description = "close agent pane"
 
 ## Keymaps
 
-The plugin sets **no keymaps**. Map the functions however you like — each takes an optional agent profile name:
+The plugin sets **no keymaps**. Map the functions however you like — `toggle()`, `focus()`, `close()` and `send()` each take an optional agent profile name (a name with no profile is used as a bare Herdr agent kind with no args):
 
 ```lua
 -- the whole flow, any agent
@@ -80,6 +80,8 @@ vim.keymap.set("n", ",8", function() require("herdr-sidekick-agents").toggle("co
   { desc = "Toggle Codex pane (herdr)" })
 ```
 
+`pick()` always starts a new pane: it shows the agent picker even when an agent pane is already open. Pass `{ zoom = false }` as the second argument to `focus()` (e.g. `focus(nil, { zoom = false })`) to jump to the agent pane without zooming it.
+
 ## Configuration
 
 Defaults shown:
@@ -91,6 +93,7 @@ require("herdr-sidekick-agents").setup({
   start_retries = 10,   -- agent-start retries while the pane shell boots
   start_retry_ms = 500,
   start_timeout_ms = 60000, -- how long herdr waits for the agent to report readiness
+  pane_env = { "Q_TERM=1" }, -- extra KEY=VALUE env for the agent pane's shell (Q_TERM=1 keeps kiro-cli's shell wrapper from blocking agent start)
   default_agent = "claude", -- offered first in the picker
   agent_order = nil,        -- optional explicit picker order; the rest follow alphabetically
   agents = {
@@ -123,13 +126,13 @@ Note: `args` is passed through verbatim. Flags like `--dangerously-skip-permissi
 
 ## How it works
 
-Everything goes through Herdr's CLI, using the environment Herdr injects into every pane (`HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_BIN_PATH`):
+Everything goes through Herdr's CLI, using the environment Herdr injects into every pane (`HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, `HERDR_BIN_PATH`):
 
-- `toggle()` looks for a pane running any configured agent kind in your tab (falling back to your space) via `herdr agent list`. If one exists in your tab it toggles `herdr pane zoom` on the editor pane (hide/show without touching the process); in another tab it focuses it; otherwise it asks which agent to start, then `herdr pane split` + `herdr agent start --kind <kind>`, retrying briefly while the new pane's shell finishes booting. Passing a name restricts every step to that one agent.
+- `toggle()` looks for a pane running any configured agent kind in your tab (falling back to your space) via `herdr agent list`. If one exists in your tab it toggles `herdr pane zoom` on the editor pane (hide/show without touching the process); in another tab it focuses it; otherwise it asks which agent to start, then `herdr pane split` (in Neovim's cwd, with `pane_env`) + `herdr agent start --kind <kind>`, retrying briefly while the new pane's shell finishes booting. Passing a name restricts every step to that one agent.
 - `focus()` unzooms the editor if needed, then `herdr agent focus` + `herdr pane zoom --on` on the agent's pane.
 - `close()` runs `herdr pane close` on the agent's pane, ending the process.
 - `send()` uses `herdr pane send-text`, which types into the agent's input without pressing enter.
-- When a tab holds more than one agent pane, the one this Neovim started most recently there wins; otherwise the first match in the tab does.
+- When a tab holds more than one agent pane, a pane of the agent kind this Neovim most recently started there wins; otherwise the first match in the tab does.
 
 On the Herdr side, the `close-agent` plugin action (see [Herdr side](#herdr-side-optional)) runs `herdr agent get` on the focused pane and, only if that finds an agent, `herdr pane close`, so you can close the agent from either side of the split.
 
