@@ -39,6 +39,24 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 }
 ```
 
+### Herdr side (optional)
+
+The repo is also a [Herdr plugin](https://herdr.dev/docs/plugins/) with one action, `close-agent`, which closes the focused pane only when it hosts a coding agent (on the editor or a plain shell it does nothing). It lets you close the agent pane from the Herdr side of the split as well:
+
+```sh
+herdr plugin install jcarlos7121/herdr-sidekick-agents.nvim
+```
+
+Then bind it in `~/.config/herdr/config.toml`:
+
+```toml
+[[keys.command]]
+key = "prefix+a"
+type = "plugin_action"
+command = "jcarlos7121.sidekick-agents.close-agent"
+description = "close agent pane"
+```
+
 ## Keymaps
 
 The plugin sets **no keymaps**. Map the functions however you like — each takes an optional agent profile name:
@@ -113,7 +131,7 @@ Everything goes through Herdr's CLI, using the environment Herdr injects into ev
 - `send()` uses `herdr pane send-text`, which types into the agent's input without pressing enter.
 - When a tab holds more than one agent pane, the one this Neovim started most recently there wins; otherwise the first match in the tab does.
 
-A natural counterpart on the Herdr side is a keybind that closes the focused pane when it's an agent pane — see [Herdr's custom command keybinds](https://herdr.dev/docs/configuration/) — so you can toggle from either side of the split.
+On the Herdr side, the `close-agent` plugin action (see [Herdr side](#herdr-side-optional)) runs `herdr agent get` on the focused pane and, only if that finds an agent, `herdr pane close`, so you can close the agent from either side of the split.
 
 ## License
 
