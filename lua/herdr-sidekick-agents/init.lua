@@ -41,7 +41,8 @@ M.config = {
   agent_order = nil,
   -- Agent profiles. `kind` must be an agent kind Herdr knows (see
   -- `herdr agent start --help`); `args` is passed to that CLI verbatim.
-  -- `ratio`, `direction` and `timeout_ms` may be overridden per agent.
+  -- `ratio`, `direction`, `timeout_ms` and `pane_env` may be set per agent.
+  -- A per-agent `pane_env` replaces the global list for that agent.
   agents = {
     claude = { kind = "claude", args = { "--continue" } },
     codex = { kind = "codex", args = {} },
@@ -75,6 +76,7 @@ function M.setup(opts)
       ratio = profile.ratio or existing.ratio,
       direction = profile.direction or existing.direction,
       timeout_ms = profile.timeout_ms or existing.timeout_ms,
+      pane_env = profile.pane_env or existing.pane_env,
     }
   end
 end

@@ -109,6 +109,7 @@ Each profile takes:
 - `kind` — an agent kind Herdr knows (`herdr agent start --help` lists them). Defaults to the profile name.
 - `args` — passed to that CLI verbatim, e.g. `{ "resume", "--last" }` for Codex or `{ "--continue" }` for Claude.
 - `ratio` / `direction` / `timeout_ms` — optional per-agent overrides of the top-level values.
+- `pane_env` — optional list of `KEY=VALUE` strings. When an agent sets it, that list replaces the global `pane_env` for that agent.
 
 Agents that open a first-run consent screen (Grok Build does) may not report readiness before the timeout. That is not fatal — the CLI is running in the pane either way, and the plugin says so rather than reporting a failure.
 
